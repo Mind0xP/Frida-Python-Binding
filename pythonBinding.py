@@ -2,7 +2,7 @@ import frida
 import argparse
 import time
 import os
-from sys import exit as sysexit
+import sys
 import subprocess
 
 def on_message(message, data):
@@ -11,20 +11,10 @@ def on_message(message, data):
     else:
         print(message)
 
-# pause script before termination based on OS type
-def pause_command_line():
-    if (os.name == "posix"):
-        os.system('read -s -n 1 -p "Press any key to continue..."')
-        print
-        sysexit(0)
-    else: 
-        os.system('pause')
-        sysexit(0)
-
 # start frida-server process
 def frida_server_start_process(device_id,frida_server):
     frida_server_subprocess = subprocess.Popen("adb -s "+device_id+" shell "+frida_server+" &", shell=True)
-    if (frida_server_subprocess):
+    if frida_server_subprocess:
         print("[*] New frida-server process initiated on PID {0}".format(frida_server_subprocess.pid))
         return frida_server_subprocess
     else:
@@ -34,7 +24,7 @@ def frida_server_start_process(device_id,frida_server):
 # kill frida-server running process
 def frida_server_kill_process(frida_subprocess):
     print("[*] Terminating frida-server process - PID: {0}".format(frida_subprocess.pid))
-    frida_subprocess.terminate()
+    frida_subprocess.kill()
 
 # installing frida-server on android devices
 def frida_server_install(device_id, frida_install_path, device_install_path='/data/local/tmp/', frida_server_name="frida-server"):
@@ -46,17 +36,17 @@ def frida_server_install(device_id, frida_install_path, device_install_path='/da
                                             stdout=subprocess.PIPE)
         data, nothing = frida_push_device.communicate()
         data_str = str(data,'utf-8')
-        if (data_str.index('pushed.')):
+        if data_str.index('pushed.'):
             print("[*] Frida-server was successfully pushed to selected device on "+ device_install_path)
             # set frida-server permissions
             frida_server_perm = subprocess.Popen("adb -s "+device_id+" shell chmod 755 \""+frida_server_device_path+"\"", shell=True,
                                                 stderr=subprocess.STDOUT, stdout=subprocess.PIPE)
             print("[*] Set frida-server with execution permissions")
             frida_server_perm.wait()
-            frida_server_perm.terminate()
+            frida_server_perm.kill()
         else:
             print("[!] Please check path permissions")
-        frida_push_device.terminate()
+        frida_push_device.kill()
         return frida_server_start_process(device_id,frida_server_device_path)
     except:
         return "[!] Frida-server was not deployed on the selected device!"
@@ -67,12 +57,11 @@ def frida_server_check_existing(device_id):
                                        shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     data, nothing = frida_existing.communicate()
     if (len(data) != 0):
-        print("[!] Frida-server is already running !")
-        frida_existing.terminate()
+        frida_existing.kill()
         return True
     else:
-        frida_existing.terminate()
-        return False
+        frida_existing.kill()
+        return None
 
 # creation of devices choice menu
 def create_devices_menu(device_list):
@@ -87,7 +76,7 @@ def create_devices_menu(device_list):
 # return user selected device
 def select_device(devices):
     user_id_selection = int(input("[*] Please specify a device number: "))
-    if( devices[user_id_selection].id == None):
+    if (devices[user_id_selection].id == None):
         print("[*] ID Was not found !")
         select_device(devices)
     selected_device = devices[user_id_selection].id
@@ -98,40 +87,68 @@ def select_device(devices):
 # enumerate local/remote/usb devices and return a list by given type
 def enumerate_connected_devices():
     devices = frida.enumerate_devices()
-    return create_devices_menu([x for x in devices if len(x.id) > 5])
+    if (len([x for x in devices if len(x.id) > 5]) != 0):
+        return create_devices_menu([x for x in devices if len(x.id) > 5])
+    else:
+        return None
 
-def frida_session_retry(con_device,con_type,**kwargs):
+def frida_session_activity_handler(con_device,activity,**kwargs):
     for _ in range(5):
-        if (con_type == 'spawn'):
+        if (activity != 'list_pids'):
             time.sleep(1)
-            pid = con_device.spawn([kwargs.get('spawn')])
-            if (pid):
-                print("[*] Spawned package : {0} on pid {1}".format(kwargs.get('spawn'),pid))
-                frida_session = con_device.attach(pid)
-                # resume app after spawning
-                con_device.resume(pid)
-                break
+            if activity == 'pid':
+                frida_session = con_device.attach(int(kwargs.get('pid')))
+            elif activity == 'spawn':
+                pid = con_device.spawn([kwargs.get('spawn')])
+                if pid:
+                    frida_session = con_device.attach(pid)
+                    # resume app after spawning
+                    con_device.resume(pid)
+                    return frida_session
+                else:
+                    pass
             else:
-                print("[!] Could not spawn the requested package, retrying: {0}".format(_))
-        # attach frida to existing running pid
-        elif (con_type == 'pid'):
-            time.sleep(1)
-            frida_session = con_device.attach(int(args.pid))
+                frida_session = con_device.attach(kwargs.get('attach'))
             if (frida_session):
-                print("-> Attaching frida session to PID - {0}".format(args.pid))
-                break
+                return frida_session
             else:
-                print("[!] Could not attach the requested process, retrying: {0}".format(_))
-        elif (con_type == 'attach'):
+                return None
+        # attach frida to existing running package by name
+        elif (activity == 'list_pids'):
             time.sleep(1)
-            frida_session = con_device.attach(kwargs.get('attach'))
-            if (frida_session):
-                print("-> Attaching frida session to process name - {0} on PID {1}".format(kwargs.get('attach'),frida_session._impl.pid))
-                break
+            pid_list = con_device.enumerate_processes()
+            if pid_list:
+                return pid_list
             else:
-                print("[!] Could not attach to the requested package, retrying {0}".format(_))
-    return frida_session
+                return None
 
+def query_yes_no_from_user(question, default="yes"):
+    """[Ask a no/yes question via input() and return the answer]
+    Arguments:
+        question {[str]} -- [string that is represented to the user]
+    Keyword Arguments:
+        default {str} -- [is presumed answer when a user press enter it must be 'yes', 'no' or None] (default: {"yes"})
+    the answer return value will be True if 'yes' or False if 'no'
+    """
+    valid = {'yes':True,'ye':True,'y':True,'Y':True,'no':False,'No':False,'n':False,'N':False}
+    if default is None:
+        prompt = "[y/n]"
+    elif default == "yes":
+        prompt = "[Y/n]"
+    elif default == "no":
+        prompt = "[y/N]"
+    else:
+        raise ValueError("[!] Invalid default answer: {0}".format(default))
+
+    while True:
+        sys.stdout.write(question + prompt)
+        choice = input()
+        if default is not None and choice == '':
+            return valid[default]
+        elif choice in valid:
+            return valid[choice]
+        else:
+            sys.stdout.write("Please respond with 'yes' or 'no' (or 'y' or 'n').\n")
 
 # read script file from local FS
 def read_hooking_script(filename):
@@ -141,7 +158,6 @@ def read_hooking_script(filename):
     except IOError:
         print("[!] The specified script '{0}' was not found!".format(filename))
         return None
-    
 
 if __name__ == '__main__':
     try:
@@ -151,40 +167,82 @@ if __name__ == '__main__':
         parser.add_argument("-p","--pid",help="Specify a PID number")
         parser.add_argument("-a","--attach",help="Set a process name to attach")
         parser.add_argument("-S","--script",help="Specify a Javascript hooking script name")
-        parser.add_argument("-R","--frida-run",default=True,action="store_true",help="Set for executing frida-server on selected device [Default On]")
         parser.add_argument("-P","--frida-path-device",default="/data/local/tmp/",help="Set frida-server path on selected device [Default /data/local/tmp/]")
-        parser.add_argument("-i","--frida-exec-path",help="Set frida-server executable installation path")
+        parser.add_argument("-i","--frida-exec-path",default="./frida-bin/frida-server",help="Set frida-server executable installation path")
         parser.add_argument("-n","--frida-server-name",default="frida-server",help="Set frida-server executable name on device [Default frida-server]")
+        parser.add_argument("-lp","--list-pids",action="store_true",help="Enumerate running processes by PID on selected device")
+        parser.add_argument("-la","--list-apps",action="store_true",help="Enumerate installed applications on selected device")
         parser.add_argument("-t","--timeout",default=1000,help="Set USB connect timeout [Default 1000]")
         args = parser.parse_args()
 
-        print("\n[*] Enumerating connected devices\n")
+        if not args.script:
+            while True:
+                args.script = input("Please type your script path: ")
+                script_exists = os.path.isfile(args.script)
+                if script_exists:
+                    break
+                else:
+                    print("[!] The file you specified does not exists.")
+
+        print("\n[*] Enumerating connected devices")
         # enumerate connected devices
         devices = enumerate_connected_devices()
-        selected_device = select_device(devices)
-        frida_server_exist = frida_server_check_existing(selected_device)
-        if (args.frida_exec_path):
-            # check if frida-server is already running
-            if (frida_server_exist):
-                pass
-            else:
+        if devices:
+            selected_device = select_device(devices)
+        else:
+            print("[!] No connected devices found")
+            exit()
+        if frida_server_check_existing(selected_device):
+            print("[*] Frida-server is running on the selected device!")
+        else:
+            if args.frida_exec_path:
                 frida_server_process = frida_server_install(selected_device,args.frida_exec_path,
-                                                            args.frida_path_device,args.frida_server_name)
-        elif (args.frida_run):
-            # check if frida-server is already running
-            if (frida_server_exist):
-                pass
+                                                        args.frida_path_device,args.frida_server_name)
             else:
-                frida_server_process = frida_server_start_process(selected_device,args.frida_path_device+args.frida_server_name)
+                frida_install_prompt_answer = query_yes_no_from_user("[!] Frida-server is not installed/running on the selected device,"+
+                                                          "do you wish to install it now?")
+                if frida_install_prompt_answer:
+                    frida_server_process = frida_server_install(selected_device,args.frida_exec_path,
+                                                                args.frida_path_device,args.frida_server_name)
+                else:
+                    print("[!] The script cannot run without frida-server running")
+        #     frida_server_process = frida_server_start_process(selected_device,args.frida_path_device+args.frida_server_name)
         connected_device = frida.get_device(selected_device, args.timeout)
-        # spawn a new process instance and attach
-        if (args.spawn):
-            frida_session = frida_session_retry(connected_device,'spawn',spawn=args.spawn)
+        if args.list_pids or args.list_apps:
+            pid_list = frida_session_activity_handler(connected_device,'list_pids')
+            if pid_list:
+                print("-" * 50 + "\n[*] Generated process list on selected device\n" + "-" * 50)
+                print("Process Name" + " " * 21 + "PID"+"\n"+"-" * 30 + " " + "-" * 7)
+                for key, val in enumerate(pid_list):
+                    spaces = " " * (33 - len(pid_list[key].name))
+                    print("{0}{1}{2}".format(pid_list[key].name,spaces,pid_list[key].pid))
+                pid_choice = int(input("\n[*] Please enter PID number: "))
+                frida_session = frida_session_activity_handler(connected_device,'pid',pid=pid_choice)
+            else:
+                print("[!] Could not enumerate process on the selected device")
+                exit()
+        # spawn a new process instance and attac
+        elif args.spawn:
+            frida_session = frida_session_activity_handler(connected_device,'spawn',spawn=args.spawn)
+            if frida_session:
+                print("[*] Spawned package : {0} on pid {1}".format(args.spawn,frida_session._impl.pid))
+            else:
+                print("[!] Could not spawn the requested package")
+                exit()
         # attach frida to existing running pid
-        elif (args.pid):
-            frida_session = frida_session_retry(connected_device,'pid')
-        elif (args.attach):
-            frida_session = frida_session_retry(connected_device,'attach',attach=args.attach)
+        elif args.pid:
+            frida_session = frida_session_activity_handler(connected_device,'pid',pid=args.pid)
+            if frida_session:
+                print("-> Attaching frida session to PID - {0}".format(frida_session._impl.pid))
+            else:
+                print("[!] Could not attach the requested process")
+                exit()
+        elif args.attach:
+            frida_session = frida_session_activity_handler(connected_device,'attach',attach=args.attach)
+            if frida_session:
+                print("-> Attaching frida session to process name - {0}".format(args.attach))
+            else: 
+                print("[!] Could not attach to the requested package")
         else:
             print("[!] You must specify atleast one option to run the application\n[*] Please use --help for full reference")
         # set timeout so java.perform will not crash
@@ -196,8 +254,7 @@ if __name__ == '__main__':
         hooking_script.load()
 
         # stop python script from terminating
-        input()
+        input('Press any key to continue...')
         # kill frida-server process before exiting
-        frida_server_kill_process(frida_server_process)
-    except:
-        print("\n[!] Something went wrong, please check your input.")
+    except Exception as e:
+        print("\n[!] Something went wrong, please check your input.\n Error - {0}".format(e))
