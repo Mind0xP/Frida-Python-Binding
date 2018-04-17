@@ -6,7 +6,7 @@ Easy to use Frida python binding script for Android reversing automation.
 ![app-demo](https://i.imgur.com/SyNcaix.gif)
 
 # Usage
-Use the --help argument to get full 
+Use the --help argument to get the full arguments list
 ```
 usage: pythonBinding.py [-h] [-s SPAWN] [-p PID] [-a ATTACH] [-S SCRIPT]
                         [-P FRIDA_PATH_DEVICE] [-i FRIDA_EXEC_PATH]
@@ -38,6 +38,6 @@ optional arguments:
 ```
 
 # How-to install
-  * Make sure to use Python 3.x to run the script.  
+  * Make sure to use Python 3.x.
   * install the dependecies by running:  
     `pip install -r requirements.txt`
