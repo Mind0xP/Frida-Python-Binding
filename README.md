@@ -2,7 +2,7 @@
 Easy to use Frida python binding script for Android reversing automation.
 The idea behind the script was to make frida's binding much easier and quicker, as of:
 1. Enumerate every connected device (usb/remote/local) to your machine and generate a selection menu. 
-2. Automatically install frida agent on a selected device with changeable arguments (dir location, execution path etc). inside the bin folder I have placed a frida-server v1.7.3 for android x86, make sure to use the same version on your client or just replace the file with your current version, in other cases you can use the `--frida-exec-path` argument to specify a different path for your frida-server binary.
+2. Automatically install frida agent on a selected device with changeable arguments (dir location, execution path etc). inside the `bin` folder I have placed a `frida-server` v1.7.3 for android x86, make sure to use the same version on your client or just replace the file with your current version, in other cases you can use the `--frida-exec-path` argument to specify a different path for your `frida-server` binary.
 3. The script is able to enumerate running processes(`--list-pids`)/installed packages(`--list-apps`) and generate a selection menu for the user.
 
 ### Demo
@@ -10,7 +10,7 @@ The idea behind the script was to make frida's binding much easier and quicker, 
 ![app-demo](https://i.imgur.com/SyNcaix.gif)
 
 ### Usage
-Use the --help argument to get the full arguments list
+Use the `--help` argument to get the full arguments list
 ```
 usage: pythonBinding.py [-h] [-s SPAWN] [-p PID] [-a ATTACH] [-S SCRIPT]
                         [-P FRIDA_PATH_DEVICE] [-i FRIDA_EXEC_PATH]
@@ -42,7 +42,7 @@ optional arguments:
 ```
 
 ### How-to install
-  * Make sure to use **Python 3.x**.
+  * Make sure to use `Python 3.x`.
   * Install `adb` via Android SDK and check that the environment variables are set correctly.
   * Install the dependecies by running:  
     `pip install -r requirements.txt`
