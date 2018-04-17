@@ -1,5 +1,9 @@
 # Frida-Python-Binding
 Easy to use Frida python binding script for Android reversing automation.
+The idea behind the script was to make frida's binding much easier and quicker, as of:
+1. Enumerate every connected device (usb/remote/local) to your machine and generating a selection menu. 
+2. Automatically install frida agent on selected device with changable arguments (dir location, execution path etc). inside the bin folder I have placed a frida-server v1.7.3 for android x86, make sure to use the same version on your client or just replace the file with your current version, in other cases you can use the `--frida-exec-path` argument to specify a different path for your frida-server binary.
+3. The script is able enumerate running processes(`--list-pids`)/installed packages(`--list-apps`) and generate a selection menu for the user.
 
 ### Demo
 
@@ -38,6 +42,6 @@ optional arguments:
 ```
 
 ### How-to install
-  * Make sure to use Python 3.x.
+  * Make sure to use **Python 3.x**.
   * install the dependecies by running:  
     `pip install -r requirements.txt`
