@@ -43,5 +43,6 @@ optional arguments:
 
 ### How-to install
   * Make sure to use **Python 3.x**.
-  * install the dependecies by running:  
+  * Install `adb` via Android SDK and check that the environment variables are set correctly.
+  * Install the dependecies by running:  
     `pip install -r requirements.txt`
