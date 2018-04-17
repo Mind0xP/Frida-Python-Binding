@@ -1,6 +1,10 @@
 # Frida-Python-Binding
 Easy to use Frida python binding script for Android reversing automation.
 
+# Demo
+
+![app-demo](https://i.imgur.com/SyNcaix.gif)
+
 # Usage
 Use the --help argument to get full 
 ```
@@ -32,10 +36,6 @@ optional arguments:
   -t TIMEOUT, --timeout TIMEOUT
                         Set USB connect timeout [Default 1000]
 ```
-
-# So whats in it ?
-
-![app-demo](https://i.imgur.com/SyNcaix.gif)
 
 # How-to install
 Make sure to use Python 3.x to run the script.
