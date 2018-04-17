@@ -180,7 +180,7 @@ if __name__ == '__main__':
         parser.add_argument("-a","--attach",help="Set a process name to attach")
         parser.add_argument("-S","--script",help="Specify a Javascript hooking script name")
         parser.add_argument("-P","--frida-path-device",default="/data/local/tmp/",help="Set frida-server path on selected device [Default /data/local/tmp/]")
-        parser.add_argument("-i","--frida-exec-path",default="./frida-bin/frida-server",help="Set frida-server executable installation path")
+        parser.add_argument("-i","--frida-exec-path",default="./bin/frida-server",help="Set frida-server executable installation path")
         parser.add_argument("-n","--frida-server-name",default="frida-server",help="Set frida-server executable name on device [Default frida-server]")
         parser.add_argument("-lp","--list-pids",action="store_true",help="Enumerate running processes by PID on selected device")
         parser.add_argument("-la","--list-apps",action="store_true",help="Enumerate installed applications on selected device")
