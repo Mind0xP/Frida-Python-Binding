@@ -1,11 +1,11 @@
 # Frida-Python-Binding
 Easy to use Frida python binding script for Android reversing automation.
 
-# Demo
+### Demo
 
 ![app-demo](https://i.imgur.com/SyNcaix.gif)
 
-# Usage
+### Usage
 Use the --help argument to get the full arguments list
 ```
 usage: pythonBinding.py [-h] [-s SPAWN] [-p PID] [-a ATTACH] [-S SCRIPT]
@@ -37,7 +37,7 @@ optional arguments:
                         Set USB connect timeout [Default 1000]
 ```
 
-# How-to install
+### How-to install
   * Make sure to use Python 3.x.
   * install the dependecies by running:  
     `pip install -r requirements.txt`
