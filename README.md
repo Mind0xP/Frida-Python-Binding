@@ -9,7 +9,11 @@ The idea behind the script was to make frida's binding much easier and quicker, 
 
 ![app-demo](https://i.imgur.com/SyNcaix.gif)
 
-### Usage
+### Basic Usage
+Some examples:  
+`fridaPyBinding.py --list-apps --script /your/path/2/file`  
+`fridaPyBinding.py -i /your/path/2/frida-server --spawn com.android.browser`  
+
 Use the `--help` argument to get the full arguments list
 ```
 usage: pythonBinding.py [-h] [-s SPAWN] [-p PID] [-a ATTACH] [-S SCRIPT]
