@@ -2,6 +2,9 @@ import frida
 import os
 import logging
 import subprocess
+import requests
+import lzma
+import re
 from termcolor import colored
 from argparse import ArgumentParser
 from time import sleep
@@ -10,7 +13,7 @@ from colorlog import ColoredFormatter
 
 def setup_logging():
     logger = logging.getLogger()
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(logging.INFO)
     color_formatter = ColoredFormatter(
 	        "%(log_color)s[%(asctime)s] [%(levelname)-4s]%(reset)s - %(message)s",
 	        datefmt='%d-%m-%y %H:%M:%S',
@@ -31,6 +34,50 @@ def setup_logging():
 # setup logging for script
 setup_logging()
 logger = logging.getLogger(__name__)
+
+# extract frida-server tar.xz
+def extract_frida_server_comp(file_path):
+    # create a subdir for the specified filename
+    frida_server_dir = file_path[:-3]
+    os.makedirs(frida_server_dir)
+    with lzma.open(file_path, 'rb') as f:
+        decompressed_file = f.read()
+    with open(frida_server_dir+'/frida-server', 'wb') as f:
+        f.write(decompressed_file)
+        logger.info("Extracted frida-server under - /{0}".format(frida_server_dir))
+    return
+
+# check if specific a frida-server is version already located locally
+def check_frida_server_version_local(folder_name):
+    if os.path.exists(folder_name):
+        return True
+    else:
+        return False
+
+def get_frida_server_repo(arch,version='latest'):
+    base_url = 'https://github.com/frida/frida/releases'
+    if version == 'latest':
+        url = base_url
+    else:
+        url = base_url + '/tag/' + version
+    res = requests.get(url)
+    frida_server_path = re.findall(r'\/download\/\d+\.\d+\.\d+\/frida\-server\-\d+\.\d+\.\d+\-android\-'+arch+'\.xz',res.text)
+    download_url = base_url + frida_server_path[0]
+    filename = frida_server_path[0].split("/")[-1]
+    # check if folder already exists
+    frida_server_file_path = 'bin/'+filename
+    frida_server_work_folder = frida_server_file_path[:-3]
+    ck_frida_server_folder = check_frida_server_version_local(frida_server_work_folder)
+    if ck_frida_server_folder:
+        logger.info("The requested version \'{0}\' is already located locally".format(filename[:-3]))
+    else:
+        # download & write file locally
+        with open('bin/'+filename, "wb") as f:
+            res = requests.get(download_url)
+            f.write(res.content)
+        logger.info("The requested file \'{0}\' was successfully downloaded".format(filename))
+        extract_frida_server_comp(frida_server_file_path)
+    return frida_server_work_folder
 
 def on_message(message, data):
     if message['type'] == 'send':
@@ -179,6 +226,7 @@ if __name__ == '__main__':
         parser.add_argument("-p","--pid",help="Specify a PID number")
         parser.add_argument("-a","--attach",help="Set a process name to attach")
         parser.add_argument("-S","--script",help="Specify a Javascript hooking script name")
+        parser.add_argument("-d","--download-frida",action="store_true",help="Check this option for auto downloading frida-server from repo")
         parser.add_argument("-P","--frida-path-device",default="/data/local/tmp/",help="Set frida-server path on selected device [Default /data/local/tmp/]")
         parser.add_argument("-i","--frida-exec-path",default="./bin/frida-server",help="Set frida-server executable installation path")
         parser.add_argument("-n","--frida-server-name",default="frida-server",help="Set frida-server executable name on device [Default frida-server]")
@@ -186,6 +234,19 @@ if __name__ == '__main__':
         parser.add_argument("-la","--list-apps",action="store_true",help="Enumerate installed applications on selected device")
         parser.add_argument("-t","--timeout",default=1000,help="Set USB connect timeout [Default 1000]")
         args = parser.parse_args()
+
+        if args.download_frida:
+            frida_server_version = input("[*] Please specifiy the frida-server version to download (blank will get latest)? ")
+            frida_server_arch = input("[*] Please specifiy the frida-server architecture [x86,x86_64,arm,arm64]? ")
+            if not frida_server_version:
+                filename = get_frida_server_repo(frida_server_arch)
+            else:
+                filename = get_frida_server_repo(frida_server_arch,frida_server_version)
+            frida_server_default = input("[*] Do you want to set this version as default [y/n]? ")
+            if (frida_server_default == 'y') or (frida_server_default == 'Y'):
+                print(filename)
+            else:
+                pass
 
         if not args.script:
             while True:
