@@ -56,4 +56,4 @@ optional arguments:
     `pip install -r requirements.txt`
 
 ### Special thanks
-  * A special thanks to Tomer Zait (@realgam3) for sharing his wide knowledge on FridaRE, and being an amazing friend :)
+  * A special thanks to Tomer Zait ([realgam3](https://github.com/realgam3)) for sharing his wide knowledge on FridaRE, and being an amazing friend :)
