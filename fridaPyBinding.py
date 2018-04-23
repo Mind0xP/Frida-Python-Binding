@@ -5,6 +5,7 @@ import subprocess
 import requests
 import lzma
 import re
+from shutil import copyfile
 from termcolor import colored
 from argparse import ArgumentParser
 from time import sleep
@@ -35,6 +36,12 @@ def setup_logging():
 setup_logging()
 logger = logging.getLogger(__name__)
 
+def on_message(message, data):
+    if message['type'] == 'send':
+        print("[*] {0}".format(message['payload']))
+    else:
+        print(message)
+
 # extract frida-server tar.xz
 def extract_frida_server_comp(file_path):
     # create a subdir for the specified filename
@@ -44,7 +51,9 @@ def extract_frida_server_comp(file_path):
         decompressed_file = f.read()
     with open(frida_server_dir+'/frida-server', 'wb') as f:
         f.write(decompressed_file)
-        logger.info("Extracted frida-server under - /{0}".format(frida_server_dir))
+        logger.info("Extracted frida-server under - {0}".format(frida_server_dir))
+    # del compressed file
+    os.remove(file_path)
     return
 
 # check if specific a frida-server is version already located locally
@@ -54,6 +63,7 @@ def check_frida_server_version_local(folder_name):
     else:
         return False
 
+# gets frida-server binaries by requested version/arch
 def get_frida_server_repo(arch,version='latest'):
     base_url = 'https://github.com/frida/frida/releases'
     if version == 'latest':
@@ -65,9 +75,10 @@ def get_frida_server_repo(arch,version='latest'):
     download_url = base_url + frida_server_path[0]
     filename = frida_server_path[0].split("/")[-1]
     # check if folder already exists
-    frida_server_file_path = 'bin/'+filename
-    frida_server_work_folder = frida_server_file_path[:-3]
-    ck_frida_server_folder = check_frida_server_version_local(frida_server_work_folder)
+    frida_server_bin_folder = os.path.abspath('bin/')
+    frida_server_file_path = os.path.abspath('bin/'+filename)
+    frida_server_download_folder = frida_server_file_path[:-3]
+    ck_frida_server_folder = check_frida_server_version_local(frida_server_download_folder)
     if ck_frida_server_folder:
         logger.info("The requested version \'{0}\' is already located locally".format(filename[:-3]))
     else:
@@ -77,13 +88,28 @@ def get_frida_server_repo(arch,version='latest'):
             f.write(res.content)
         logger.info("The requested file \'{0}\' was successfully downloaded".format(filename))
         extract_frida_server_comp(frida_server_file_path)
-    return frida_server_work_folder
+    return frida_server_bin_folder, frida_server_download_folder
 
-def on_message(message, data):
-    if message['type'] == 'send':
-        print("[*] {0}".format(message['payload']))
+def frida_server_set_default(src_path,dst_path):
+    frida_server_exec_src = src_path+'/frida-server'
+    frida_server_exec_dst = dst_path+'/frida-server'
+    copied_file = copyfile(frida_server_exec_src,frida_server_exec_dst)
+    if copied_file:
+        logger.info("The chosen frida-server version was set to default!")
+        return copied_file
     else:
-        print(message)
+        return None
+
+def frida_server_local_versions():
+    dir_list = os.listdir("bin")
+    frida_server_local_v = [x for x in dir_list if x.find('.') > -1]
+    print(" Id  |" + "   Arch " +"  " +"|" + " " * 3 + "Version")
+    print("-" * 5 + "+" + "-" * 10 + "+" + "-" * 12)
+    for k,v in enumerate(frida_server_local_v):
+        _version = v.split("-")
+        print("[{0}]  |   {1}    |   {2}    ".format(k,_version[4],_version[2]))
+    print("-"*29)
+    return frida_server_local_v
 
 # start frida-server process
 def frida_server_start_process(device_id,frida_server):
@@ -227,6 +253,7 @@ if __name__ == '__main__':
         parser.add_argument("-a","--attach",help="Set a process name to attach")
         parser.add_argument("-S","--script",help="Specify a Javascript hooking script name")
         parser.add_argument("-d","--download-frida",action="store_true",help="Check this option for auto downloading frida-server from repo")
+        parser.add_argument("-fv","--frida-version",action="store_true",help="Set frida-server version to use as default")
         parser.add_argument("-P","--frida-path-device",default="/data/local/tmp/",help="Set frida-server path on selected device [Default /data/local/tmp/]")
         parser.add_argument("-i","--frida-exec-path",default="./bin/frida-server",help="Set frida-server executable installation path")
         parser.add_argument("-n","--frida-server-name",default="frida-server",help="Set frida-server executable name on device [Default frida-server]")
@@ -235,18 +262,26 @@ if __name__ == '__main__':
         parser.add_argument("-t","--timeout",default=1000,help="Set USB connect timeout [Default 1000]")
         args = parser.parse_args()
 
+        # download different versions and arch of frida-server
         if args.download_frida:
             frida_server_version = input("[*] Please specifiy the frida-server version to download (blank will get latest)? ")
             frida_server_arch = input("[*] Please specifiy the frida-server architecture [x86,x86_64,arm,arm64]? ")
             if not frida_server_version:
-                filename = get_frida_server_repo(frida_server_arch)
+                bin_folder,download_path = get_frida_server_repo(frida_server_arch)
             else:
-                filename = get_frida_server_repo(frida_server_arch,frida_server_version)
+                bin_folder,download_path = get_frida_server_repo(frida_server_arch,frida_server_version)
             frida_server_default = input("[*] Do you want to set this version as default [y/n]? ")
             if (frida_server_default == 'y') or (frida_server_default == 'Y'):
-                print(filename)
+                frida_server_set_default(download_path,bin_folder)
             else:
                 pass
+
+        # change frida-server default version
+        if args.frida_version:
+            frida_server_versions = frida_server_local_versions()
+            frida_server_id = int(input("[*] Please specifiy an ID to set a default frida-server? "))
+            frida_server_id = frida_server_versions[frida_server_id]
+            frida_server_set_default(os.path.abspath('bin/'+frida_server_id),os.path.abspath('bin'))
 
         if not args.script:
             while True:
@@ -256,6 +291,7 @@ if __name__ == '__main__':
                     break
                 else:
                     logger.error("The file you specified does not exists.")
+                    
         logger.info("Enumerating connected devices\n")
         # enumerate connected devices
         devices = enumerate_connected_devices()
@@ -311,7 +347,7 @@ if __name__ == '__main__':
                 app_choice = int(input("\n[*] Please enter an id: "))
                 app_choice = apps_list[app_choice].identifier
                 while True:
-                    user_activity_choice = input("\n[?] What do you want to spawn or attach [S/A]?")
+                    user_activity_choice = input("\n[?] What do you want to spawn or attach [S/A]? ")
                     if (user_activity_choice == 'S') or (user_activity_choice == 's'):
                         frida_session = frida_session_activity_handler(connected_device,'spawn',spawn=app_choice)
                         break
